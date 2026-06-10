@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nemotron 3.5 ASR - FLEURS Benchmark</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0e17; color: #e0e0e0; min-height: 100vh; }
+
+  .header {
+    background: linear-gradient(135deg, #1a1f35 0%, #0d1020 100%);
+    border-bottom: 1px solid #2a3050;
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .header .subtitle { font-size: 12px; color: #7a8bb5; margin-top: 2px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-dot.on { background: #34d399; }
+  .status-dot.off { background: #f87171; }
+
+  .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 56px); }
+
+  .config {
+    background: #111827; border-right: 1px solid #1e293b;
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  .config-section {
+    padding: 16px; border-bottom: 1px solid #1e293b;
+  }
+  .config-section h3 {
+    font-size: 11px; font-weight: 700; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px;
+  }
+
+  .form-row { margin-bottom: 10px; }
+  .form-row label {
+    display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; font-weight: 500;
+  }
+  select {
+    width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #1e293b;
+    border-radius: 6px; color: #e2e8f0; font-size: 13px; outline: none;
+  }
+  select:focus { border-color: #3b82f6; }
+
+  .range-row { display: flex; align-items: center; gap: 10px; }
+  .range-row input[type=range] { flex: 1; accent-color: #3b82f6; }
+  .range-val {
+    min-width: 40px; text-align: center; font-size: 14px;
+    font-weight: 700; color: #3b82f6;
+  }
+
+  .file-count { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+  .file-list {
+    max-height: 200px; overflow-y: auto; background: #0f172a;
+    border: 1px solid #1e293b; border-radius: 6px; padding: 4px;
+  }
+  .file-item {
+    padding: 5px 8px; font-size: 12px; color: #94a3b8;
+    border-radius: 4px; cursor: pointer; display: flex;
+    align-items: center; gap: 8px;
+  }
+  .file-item:hover { background: #1e293b; }
+  .file-item input[type=checkbox] { accent-color: #3b82f6; }
+  .select-actions { display: flex; gap: 6px; margin-bottom: 8px; }
+  .select-actions button {
+    background: none; border: 1px solid #1e293b; color: #64748b;
+    padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;
+  }
+  .select-actions button:hover { border-color: #3b82f6; color: #3b82f6; }
+
+  .btn-run {
+    width: 100%; padding: 12px; background: #2563eb; color: #fff;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-run:hover { background: #1d4ed8; }
+  .btn-run:disabled { background: #1e3a5f; color: #4a6fa5; cursor: not-allowed; }
+  .btn-stop {
+    width: 100%; padding: 10px; background: #7f1d1d; color: #fca5a5;
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; margin-top: 8px;
+  }
+  .btn-stop:hover { background: #991b1b; color: #fff; }
+
+  .right { display: flex; flex-direction: column; overflow: hidden; }
+
+  .stats-bar {
+    padding: 12px 20px; background: #111827; border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; gap: 24px;
+  }
+  .stat { text-align: center; }
+  .stat-val { font-size: 20px; font-weight: 700; color: #3b82f6; }
+  .stat-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; }
+  .tab {
+    padding: 10px 20px; font-size: 12px; font-weight: 600;
+    color: #64748b; cursor: pointer; border-bottom: 2px solid transparent;
+  }
+  .tab:hover { color: #94a3b8; }
+  .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+  .results-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+  .result-card {
+    background: #111827; border: 1px solid #1e293b; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 8px; animation: fadeIn 0.3s ease;
+  }
+  .result-card .meta {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  }
+  .result-card .name {
+    font-size: 11px; font-weight: 700; color: #3b82f6;
+    background: #0c1525; padding: 2px 8px; border-radius: 4px;
+  }
+  .result-card .lang { font-size: 10px; color: #7a8bb5; background: #1a1f35; padding: 2px 6px; border-radius: 4px; }
+  .result-card .text { font-size: 14px; line-height: 1.5; color: #e2e8f0; }
+  .result-card .time { font-size: 10px; color: #475569; margin-top: 3px; }
+
+  .log-line {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 3px 8px; color: #64748b; border-bottom: 1px solid #0f172a;
+  }
+  .log-line.ok { color: #34d399; }
+  .log-line.err { color: #f87171; }
+  .log-line.info { color: #3b82f6; }
+
+  .empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; color: #475569;
+  }
+  .empty .icon { font-size: 40px; margin-bottom: 8px; opacity: 0.4; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Nemotron 3.5 ASR</h1>
+    <div class="subtitle">FLEURS Benchmark Dashboard</div>
+  </div>
+  <div><span class="status-dot off" id="statusDot"></span><span id="statusText" style="font-size:12px;color:#94a3b8;">Checking...</span></div>
+</div>
+
+<div class="layout">
+  <div class="config">
+    <div class="config-section">
+      <h3>Settings</h3>
+      <div class="form-row">
+        <label>Language</label>
+        <select id="lang">
+          <option value="english">English (en_us)</option>
+          <option value="hindi">Hindi (hi_in)</option>
+          <option value="auto">Auto-detect</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Concurrent Streams</label>
+        <div class="range-row">
+          <input type="range" id="concurrency" min="1" max="50" value="5">
+          <span class="range-val" id="concVal">5</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Chunk Size</label>
+        <select id="chunkMs">
+          <option value="80">80ms</option>
+          <option value="160">160ms</option>
+          <option value="320" selected>320ms</option>
+          <option value="560">560ms</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="config-section">
+      <h3>Files</h3>
+      <div class="file-count" id="fileCount">Loading...</div>
+      <div class="select-actions">
+        <button onclick="selectAll()">Select All</button>
+        <button onclick="selectNone()">Deselect All</button>
+        <button onclick="selectRange()">Select 1-N</button>
+      </div>
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <div class="config-section">
+      <button class="btn-run" id="runBtn" onclick="runBenchmark()">Run Benchmark</button>
+      <button class="btn-stop" id="stopBtn" onclick="stopAll()" style="display:none">Stop All</button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-val" id="statDone">0</div><div class="stat-lbl">Done</div></div>
+      <div class="stat"><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">Total</div></div>
+      <div class="stat"><div class="stat-val" id="statErrors">0</div><div class="stat-lbl">Errors</div></div>
+      <div class="stat"><div class="stat-val" id="statAvg">-</div><div class="stat-lbl">Avg Time</div></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('results',this)">Results</div>
+      <div class="tab" onclick="showTab('logs',this)">Logs</div>
+    </div>
+
+    <div class="results-body" id="resultsTab">
+      <div class="empty" id="emptyState"><div class="icon">~</div><p>Select files and click Run Benchmark</p></div>
+    </div>
+    <div class="results-body" id="logsTab" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const langCode = { english: 'en', hindi: 'hi', auto: 'auto' };
+let allFiles = {};
+let running = false;
+let stats = { done: 0, total: 0, errors: 0, times: [] };
+
+const concSlider = document.getElementById('concurrency');
+const concVal = document.getElementById('concVal');
+concSlider.oninput = () => { concVal.textContent = concSlider.value; };
+
+document.getElementById('lang').onchange = loadFiles;
+
+function log(msg, type = 'info') {
+  const d = document.getElementById('logsTab');
+  const l = document.createElement('div');
+  l.className = `log-line ${type}`;
+  l.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  d.appendChild(l);
+  d.scrollTop = d.scrollHeight;
+}
+
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('resultsTab').style.display = name === 'results' ? '' : 'none';
+  document.getElementById('logsTab').style.display = name === 'logs' ? '' : 'none';
+}
+
+function updateStats() {
+  document.getElementById('statDone').textContent = stats.done;
+  document.getElementById('statTotal').textContent = stats.total;
+  document.getElementById('statErrors').textContent = stats.errors;
+  if (stats.times.length > 0) {
+    const avg = stats.times.reduce((a, b) => a + b, 0) / stats.times.length;
+    document.getElementById('statAvg').textContent = avg.toFixed(1) + 's';
+  }
+}
+
+function setStatus(ok) {
+  document.getElementById('statusDot').className = `status-dot ${ok ? 'on' : 'off'}`;
+  document.getElementById('statusText').textContent = ok ? 'Connected' : 'Disconnected';
+}
+
+async function loadFiles() {
+  const lang = document.getElementById('lang').value;
+  const list = document.getElementById('fileList');
+  const count = document.getElementById('fileCount');
+  list.innerHTML = '';
+  count.textContent = 'Loading...';
+
+  try {
+    const res = await fetch('/v1/files');
+    allFiles = await res.json();
+  } catch (e) {
+    count.textContent = 'Failed to load files';
+    return;
+  }
+
+  const files = lang === 'auto' ? Object.values(allFiles).flat() : (allFiles[lang] || []);
+  count.textContent = `${files.length} files available`;
+
+  files.forEach((f) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<input type="checkbox" checked data-file="${f}" data-lang="${lang === 'auto' ? guessLang(f) : lang}"><span>${f}</span>`;
+    list.appendChild(item);
+  });
+}
+
+function guessLang(fn) {
+  if (fn.startsWith('en_') || fn.includes('english')) return 'english';
+  return 'hindi';
+}
+
+function getSelectedFiles() {
+  return Array.from(document.querySelectorAll('#fileList input[type=checkbox]:checked'))
+    .map(cb => ({ file: cb.dataset.file, lang: cb.dataset.lang }));
+}
+
+function selectAll() { document.querySelectorAll('#fileList input[type=checkbox]').forEach(cb => cb.checked = true); }
+function selectNone() { document.querySelectorAll('#fileList input[type=checkbox]').forEach(cb => cb.checked = false); }
+function selectRange() {
+  const n = parseInt(prompt('Select first N files:', '10'));
+  if (!n) return;
+  document.querySelectorAll('#fileList input[type=checkbox]').forEach((cb, i) => { cb.checked = i < n; });
+}
+
+function addResult(name, lang, text, isFinal, elapsed) {
+  document.getElementById('emptyState').style.display = 'none';
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.innerHTML = `
+    <div class="meta">
+      <span class="name">${name}</span>
+      <span class="lang">${lang}</span>
+      ${isFinal ? '<span class="lang" style="color:#34d399">FINAL</span>' : ''}
+      ${elapsed ? `<span class="lang" style="color:#fbbf24">${elapsed}</span>` : ''}
+    </div>
+    <div class="text">${text}</div>
+    <div class="time">${new Date().toLocaleTimeString()}</div>`;
+  document.getElementById('resultsTab').appendChild(card);
+  document.getElementById('resultsTab').scrollTop = document.getElementById('resultsTab').scrollHeight;
+}
+
+function parseWavToFloat32(buffer) {
+  const view = new DataView(buffer);
+  const numChannels = view.getUint16(22, true);
+  const sampleRate = view.getUint32(24, true);
+  const bitsPerSample = view.getUint16(34, true);
+  const dataOffset = findDataChunk(view);
+  if (dataOffset === -1) throw new Error('No data chunk found in WAV');
+
+  const bytesPerSample = bitsPerSample / 8;
+  const dataEnd = view.byteLength;
+  const totalSamples = Math.floor((dataEnd - dataOffset) / (bytesPerSample * numChannels));
+
+  const float32 = new Float32Array(totalSamples);
+  for (let i = 0; i < totalSamples; i++) {
+    const offset = dataOffset + i * bytesPerSample * numChannels;
+    if (bitsPerSample === 16) {
+      float32[i] = view.getInt16(offset, true) / 32768.0;
+    } else if (bitsPerSample === 32) {
+      float32[i] = view.getFloat32(offset, true);
+    } else if (bitsPerSample === 8) {
+      float32[i] = (view.getUint8(offset) - 128) / 128.0;
+    }
+  }
+
+  if (numChannels > 1) {
+    const mono = new Float32Array(totalSamples);
+    for (let i = 0; i < totalSamples; i++) {
+      let sum = 0;
+      for (let ch = 0; ch < numChannels; ch++) {
+        sum += float32[i * numChannels + ch];
+      }
+      mono[i] = sum / numChannels;
+    }
+    return { audio: mono, sampleRate };
+  }
+
+  return { audio: float32, sampleRate };
+}
+
+function findDataChunk(view) {
+  for (let offset = 12; offset < view.byteLength - 8; offset += 4) {
+    if (view.getUint32(offset, false) === 0x64617461) {
+      return offset + 8;
+    }
+  }
+  return -1;
+}
+
+function resample(audio, fromRate, toRate) {
+  if (fromRate === toRate) return audio;
+  const ratio = toRate / fromRate;
+  const newLen = Math.round(audio.length * ratio);
+  const out = new Float32Array(newLen);
+  for (let i = 0; i < newLen; i++) {
+    const srcIdx = i / ratio;
+    const idx = Math.floor(srcIdx);
+    const frac = srcIdx - idx;
+    out[i] = idx + 1 < audio.length
+      ? audio[idx] * (1 - frac) + audio[idx + 1] * frac
+      : audio[idx];
+  }
+  return out;
+}
+
+function float32ToInt16PCM(float32) {
+  const int16 = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    int16[i] = s < 0 ? s * 32768 : s * 32767;
+  }
+  return int16;
+}
+
+function int16ToBase64(int16) {
+  const bytes = new Uint8Array(int16.buffer);
+  let bin = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(bin);
+}
+
+function chunkAudio(audio, chunkMs) {
+  const chunkSamples = Math.max(1, Math.floor(16000 * chunkMs / 1000));
+  const chunks = [];
+  for (let i = 0; i < audio.length; i += chunkSamples) {
+    chunks.push(audio.slice(i, i + chunkSamples));
+  }
+  return chunks;
+}
+
+async function fetchAndDecodeAudio(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  const { audio, sampleRate } = parseWavToFloat32(buffer);
+  const resampled = resample(audio, sampleRate, 16000);
+  return resampled;
+}
+
+function transcribeFile(file, lang, chunkMs, wsUrl) {
+  const name = file.replace(/\.[^.]+$/, '');
+  const targetLang = langCode[lang] || 'auto';
+  const startTime = performance.now();
+
+  return new Promise(async (resolve) => {
+    try {
+      log(`Loading ${lang}/${file}...`);
+      const audio = await fetchAndDecodeAudio(`/test_audio/${lang}/${file}`);
+      const int16 = float32ToInt16PCM(audio);
+      const b64 = int16ToBase64(int16);
+      const chunks = chunkAudio(audio, chunkMs);
+      log(`Loaded ${name}: ${(audio.length / 16000).toFixed(1)}s, ${chunks.length} chunks`);
+
+      const ws = new WebSocket(wsUrl);
+      let lastText = '';
+      let chunkIdx = 0;
+
+      ws.onopen = () => {
+        setStatus(true);
+        sendNext();
+      };
+
+      ws.onmessage = (e) => {
+        const d = JSON.parse(e.data);
+        if (d.error) {
+          log(`Error on ${name}: ${d.error}`, 'err');
+          ws.close();
+          return;
+        }
+        lastText = d.text || lastText;
+        if (d.text) {
+          addResult(name, lang, d.text, d.is_final, '');
+        }
+        chunkIdx++;
+        if (chunkIdx < chunks.length) {
+          sendNext();
+        } else {
+          ws.close();
+        }
+      };
+
+      ws.onerror = (e) => {
+        log(`WS error on ${name}`, 'err');
+        stats.errors++;
+        updateStats();
+        resolve();
+      };
+
+      ws.onclose = () => {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+        stats.done++;
+        stats.times.push(parseFloat(elapsed));
+        updateStats();
+        if (lastText) {
+          log(`Done: ${name} (${elapsed}s)`, 'ok');
+        } else {
+          log(`Done: ${name} - no text (${elapsed}s)`, 'err');
+          stats.errors++;
+          updateStats();
+        }
+        resolve();
+      };
+
+      function sendNext() {
+        if (chunkIdx >= chunks.length) return;
+        ws.send(JSON.stringify({
+          stream_id: `${name}-${Date.now()}`,
+          target_lang: targetLang,
+          sample_rate: 16000,
+          encoding: 'pcm_s16le',
+          is_start: chunkIdx === 0,
+          is_end: chunkIdx === chunks.length - 1,
+          audio_b64: b64,
+        }));
+      }
+    } catch (e) {
+      log(`Failed: ${name} - ${e.message}`, 'err');
+      stats.errors++;
+      updateStats();
+      resolve();
+    }
+  });
+}
+
+async function runBenchmark() {
+  const files = getSelectedFiles();
+  const concurrency = parseInt(concSlider.value);
+  const chunkMs = parseInt(document.getElementById('chunkMs').value);
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProto}//${location.host}/v1/stream`;
+
+  if (files.length === 0) { log('No files selected', 'err'); return; }
+
+  running = true;
+  stats = { done: 0, total: files.length, errors: 0, times: [] };
+  updateStats();
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = '';
+  document.getElementById('resultsTab').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+
+  log(`Starting ${files.length} files, concurrency=${concurrency}, chunk=${chunkMs}ms`);
+
+  const batches = [];
+  for (let i = 0; i < files.length; i += concurrency) {
+    batches.push(files.slice(i, i + concurrency));
+  }
+
+  for (const batch of batches) {
+    if (!running) break;
+    await Promise.all(batch.map(f => transcribeFile(f.file, f.lang, chunkMs, wsUrl)));
+  }
+
+  running = false;
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  log(`Benchmark complete: ${stats.done}/${stats.total} done, ${stats.errors} errors`, 'ok');
+}
+
+function stopAll() {
+  running = false;
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  log('Stopped', 'err');
+}
+
+fetch('/healthz').then(r => r.json()).then(d => setStatus(d.ok)).catch(() => setStatus(false));
+loadFiles();
+</script>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nemotron ASR Triton Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0e17; color: #e0e0e0; min-height: 100vh; }
+
+  .header {
+    background: linear-gradient(135deg, #1a1f35 0%, #0d1020 100%);
+    border-bottom: 1px solid #2a3050;
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .header .subtitle { font-size: 12px; color: #7a8bb5; margin-top: 2px; }
+  .status-badge {
+    padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-badge.connected { background: #0d3320; color: #34d399; border: 1px solid #166534; }
+  .status-badge.disconnected { background: #3b1010; color: #f87171; border: 1px solid #7f1d1d; }
+
+  .main { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 56px); }
+
+  /* Left Panel */
+  .panel {
+    background: #111827; border-right: 1px solid #1e293b;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-title {
+    padding: 14px 16px; font-size: 13px; font-weight: 600;
+    color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .panel-body { padding: 16px; flex: 1; overflow-y: auto; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group select {
+    width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #1e293b;
+    border-radius: 6px; color: #e2e8f0; font-size: 13px; outline: none;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: #3b82f6; }
+
+  .btn {
+    padding: 10px 16px; border: none; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%;
+  }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-primary:disabled { background: #1e3a5f; color: #4a6fa5; cursor: not-allowed; }
+  .btn-danger { background: #7f1d1d; color: #fca5a5; margin-top: 8px; }
+  .btn-danger:hover { background: #991b1b; color: #fff; }
+
+  .file-drop {
+    border: 2px dashed #1e293b; border-radius: 8px; padding: 24px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    margin-bottom: 14px;
+  }
+  .file-drop:hover { border-color: #3b82f6; background: #0c1525; }
+  .file-drop.active { border-color: #3b82f6; background: #0c1525; }
+  .file-drop p { font-size: 13px; color: #64748b; }
+  .file-drop .icon { font-size: 28px; margin-bottom: 8px; }
+
+  .stream-list { list-style: none; }
+  .stream-item {
+    padding: 8px 12px; background: #0f172a; border: 1px solid #1e293b;
+    border-radius: 6px; margin-bottom: 6px; font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stream-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #34d399; flex-shrink: 0;
+  }
+  .stream-dot.done { background: #64748b; }
+
+  /* Right Panel - Results */
+  .results-panel {
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .results-header {
+    padding: 12px 20px; background: #111827; border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .results-header h2 { font-size: 14px; color: #94a3b8; font-weight: 600; }
+  .results-stats { display: flex; gap: 16px; }
+  .stat { text-align: center; }
+  .stat-value { font-size: 18px; font-weight: 700; color: #3b82f6; }
+  .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; }
+
+  .results-body {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+  }
+
+  .transcript-card {
+    background: #111827; border: 1px solid #1e293b; border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 10px;
+    animation: fadeIn 0.3s ease;
+  }
+  .transcript-card .meta {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .transcript-card .stream-name {
+    font-size: 11px; font-weight: 600; color: #3b82f6;
+    background: #0c1525; padding: 2px 8px; border-radius: 4px;
+  }
+  .transcript-card .lang-tag {
+    font-size: 10px; color: #7a8bb5; background: #1a1f35;
+    padding: 2px 6px; border-radius: 4px;
+  }
+  .transcript-card .text {
+    font-size: 15px; line-height: 1.5; color: #e2e8f0;
+    word-wrap: break-word;
+  }
+  .transcript-card .text.partial { color: #94a3b8; font-style: italic; }
+  .transcript-card .timestamp { font-size: 10px; color: #475569; margin-top: 4px; }
+
+  .log-entry {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 4px 8px; color: #64748b; border-bottom: 1px solid #0f172a;
+  }
+  .log-entry.error { color: #f87171; }
+  .log-entry.info { color: #34d399; }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; color: #475569;
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+  .empty-state p { font-size: 14px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .tabs { display: flex; border-bottom: 1px solid #1e293b; }
+  .tab {
+    padding: 8px 16px; font-size: 12px; font-weight: 600;
+    color: #64748b; cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: #94a3b8; }
+  .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Nemotron 3.5 ASR</h1>
+    <div class="subtitle">Triton Streaming Dashboard</div>
+  </div>
+  <div id="statusBadge" class="status-badge disconnected">Disconnected</div>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-title">Transcription</div>
+    <div class="panel-body">
+      <div class="form-group">
+        <label>Server URL</label>
+        <input type="text" id="serverUrl" value="ws://localhost:8000/v1/stream">
+      </div>
+
+      <div class="file-drop" id="fileDrop">
+        <div class="icon">+</div>
+        <p>Drop audio files here or click to browse</p>
+        <input type="file" id="fileInput" accept="audio/*,.flac,.wav,.mp3,.ogg" multiple hidden>
+      </div>
+
+      <div class="form-group">
+        <label>Target Language</label>
+        <select id="targetLang">
+          <option value="auto">Auto-detect</option>
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Chunk Size (ms)</label>
+        <select id="chunkMs">
+          <option value="80">80ms</option>
+          <option value="160">160ms</option>
+          <option value="320" selected>320ms</option>
+          <option value="560">560ms</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Concurrency</label>
+        <select id="concurrency">
+          <option value="1">1 stream</option>
+          <option value="2">2 streams</option>
+          <option value="5">5 streams</option>
+          <option value="10">10 streams</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="transcribeBtn" onclick="startTranscription()">
+        Transcribe
+      </button>
+      <button class="btn btn-danger" id="stopBtn" onclick="stopAll()" style="display:none;">
+        Stop All
+      </button>
+
+      <div style="margin-top: 16px;">
+        <div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:600;">
+          Active Streams
+        </div>
+        <ul class="stream-list" id="streamList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-panel">
+    <div class="results-header">
+      <h2>Results</h2>
+      <div class="results-stats">
+        <div class="stat">
+          <div class="stat-value" id="totalTranscripts">0</div>
+          <div class="stat-label">Transcripts</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="totalStreams">0</div>
+          <div class="stat-label">Streams Done</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="avgLatency">-</div>
+          <div class="stat-label">Avg Latency</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('results', this)">Results</div>
+      <div class="tab" onclick="showTab('logs', this)">Logs</div>
+    </div>
+
+    <div class="results-body" id="resultsTab">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">~</div>
+        <p>No transcripts yet. Drop an audio file to begin.</p>
+      </div>
+    </div>
+
+    <div class="results-body" id="logsTab" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+let activeStreams = new Map();
+let totalTranscriptCount = 0;
+let totalStreamsDone = 0;
+let latencies = [];
+
+const statusBadge = document.getElementById('statusBadge');
+const streamList = document.getElementById('streamList');
+const fileDrop = document.getElementById('fileDrop');
+const fileInput = document.getElementById('fileInput');
+const resultsTab = document.getElementById('resultsTab');
+const logsTab = document.getElementById('logsTab');
+const emptyState = document.getElementById('emptyState');
+
+fileDrop.addEventListener('click', () => fileInput.click());
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('active'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('active'));
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDrop.classList.remove('active');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function log(msg, type = 'info') {
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  logsTab.appendChild(entry);
+  logsTab.scrollTop = logsTab.scrollHeight;
+}
+
+function showTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  resultsTab.style.display = tab === 'results' ? '' : 'none';
+  logsTab.style.display = tab === 'logs' ? '' : 'none';
+}
+
+function updateStatus(connected) {
+  statusBadge.textContent = connected ? 'Connected' : 'Disconnected';
+  statusBadge.className = `status-badge ${connected ? 'connected' : 'disconnected'}`;
+}
+
+function updateStats() {
+  document.getElementById('totalTranscripts').textContent = totalTranscriptCount;
+  document.getElementById('totalStreams').textContent = totalStreamsDone;
+  if (latencies.length > 0) {
+    const avg = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+    document.getElementById('avgLatency').textContent = avg.toFixed(1) + 's';
+  }
+}
+
+function loadAudioAsPCM16(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(e.target.result);
+        let channelData = audioBuffer.getChannelData(0);
+        if (audioBuffer.sampleRate !== 16000) {
+          const ratio = 16000 / audioBuffer.sampleRate;
+          const newLen = Math.round(channelData.length * ratio);
+          const result = new Float32Array(newLen);
+          for (let i = 0; i < newLen; i++) {
+            const srcIdx = i / ratio;
+            const idx = Math.floor(srcIdx);
+            const frac = srcIdx - idx;
+            result[i] = idx + 1 < channelData.length
+              ? channelData[idx] * (1 - frac) + channelData[idx + 1] * frac
+              : channelData[idx];
+          }
+          channelData = result;
+        }
+        resolve({ audio: channelData, sampleRate: 16000 });
+      } catch (err) { reject(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function addStreamItem(id) {
+  const li = document.createElement('li');
+  li.className = 'stream-item';
+  li.id = `stream-${id}`;
+  li.innerHTML = `<span class="stream-dot"></span><span>${id}</span>`;
+  streamList.appendChild(li);
+}
+
+function markStreamDone(id) {
+  const li = document.getElementById(`stream-${id}`);
+  if (li) {
+    li.querySelector('.stream-dot').className = 'stream-dot done';
+  }
+}
+
+function addTranscriptCard(streamId, text, language, isFinal) {
+  emptyState.style.display = 'none';
+  const card = document.createElement('div');
+  card.className = 'transcript-card';
+  card.innerHTML = `
+    <div class="meta">
+      <span class="stream-name">${streamId}</span>
+      <span class="lang-tag">${language || 'auto'}</span>
+      ${isFinal ? '<span class="lang-tag" style="color:#34d399;">FINAL</span>' : '<span class="lang-tag" style="color:#fbbf24;">PARTIAL</span>'}
+    </div>
+    <div class="text ${isFinal ? '' : 'partial'}">${text}</div>
+    <div class="timestamp">${new Date().toLocaleTimeString()}</div>
+  `;
+  resultsTab.appendChild(card);
+  resultsTab.scrollTop = resultsTab.scrollHeight;
+  totalTranscriptCount++;
+  updateStats();
+}
+
+function base64EncodePCM16(float32Array) {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 32768 : s * 32767;
+  }
+  const bytes = new Uint8Array(int16Array.buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function chunkAudio(audio, chunkMs) {
+  const chunkSamples = Math.max(1, Math.floor(16000 * chunkMs / 1000));
+  const chunks = [];
+  for (let i = 0; i < audio.length; i += chunkSamples) {
+    chunks.push(audio.slice(i, i + chunkSamples));
+  }
+  return chunks;
+}
+
+async function streamFile(file, targetLang, chunkMs, serverUrl) {
+  const streamId = `${file.name}-${Math.random().toString(36).slice(2, 8)}`;
+  const startTime = performance.now();
+
+  log(`Starting stream: ${streamId}`);
+  addStreamItem(streamId);
+
+  const { audio } = await loadAudioAsPCM16(file);
+  const chunks = chunkAudio(audio, chunkMs);
+
+  const ws = new WebSocket(serverUrl);
+  let lastText = '';
+
+  return new Promise((resolve) => {
+    ws.onopen = () => {
+      updateStatus(true);
+      log(`Connected: ${streamId}`);
+
+      let i = 0;
+      function sendNext() {
+        if (i >= chunks.length) {
+          ws.close();
+          return;
+        }
+        const chunk = chunks[i];
+        const payload = {
+          stream_id: streamId,
+          target_lang: targetLang,
+          sample_rate: 16000,
+          encoding: 'pcm_s16le',
+          is_start: i === 0,
+          is_end: i === chunks.length - 1,
+          audio_b64: base64EncodePCM16(chunk),
+        };
+        ws.send(JSON.stringify(payload));
+        i++;
+      }
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          log(`Error: ${data.error}`, 'error');
+          ws.close();
+          return;
+        }
+        lastText = data.text;
+        if (data.text) {
+          addTranscriptCard(streamId, data.text, data.language, data.is_final);
+        }
+        sendNext();
+      };
+
+      sendNext();
+    };
+
+    ws.onclose = () => {
+      updateStatus(false);
+      markStreamDone(streamId);
+      const elapsed = (performance.now() - startTime) / 1000;
+      latencies.push(elapsed);
+      totalStreamsDone++;
+      updateStats();
+      log(`Done: ${streamId} (${elapsed.toFixed(2)}s)`);
+      resolve({ streamId, text: lastText, elapsed });
+    };
+
+    ws.onerror = (err) => {
+      log(`WebSocket error: ${err.message || 'connection failed'}`, 'error');
+    };
+  });
+}
+
+async function startTranscription() {
+  const files = fileInput.files;
+  if (!files || files.length === 0) {
+    log('No files selected', 'error');
+    return;
+  }
+
+  const serverUrl = document.getElementById('serverUrl').value;
+  const targetLang = document.getElementById('targetLang').value;
+  const chunkMs = parseInt(document.getElementById('chunkMs').value);
+  const concurrency = parseInt(document.getElementById('concurrency').value);
+
+  document.getElementById('transcribeBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = '';
+
+  const batches = [];
+  for (let i = 0; i < files.length; i += concurrency) {
+    batches.push(Array.from(files).slice(i, i + concurrency));
+  }
+
+  for (const batch of batches) {
+    await Promise.all(batch.map(f => streamFile(f, targetLang, chunkMs, serverUrl)));
+  }
+
+  document.getElementById('transcribeBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  log(`All ${files.length} files completed`);
+}
+
+function stopAll() {
+  // Close all active WebSocket connections
+  activeStreams.forEach((ws) => {
+    try { ws.close(); } catch(e) {}
+  });
+  activeStreams.clear();
+  document.getElementById('transcribeBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  log('Stopped all streams', 'error');
+}
+
+// Auto-fill server URL based on page location
+if (location.protocol === 'https:') {
+  document.getElementById('serverUrl').value = `wss://${location.host}/v1/stream`;
+} else {
+  document.getElementById('serverUrl').value = `ws://${location.host}/v1/stream`;
+}
+</script>
+</body>
+</html>

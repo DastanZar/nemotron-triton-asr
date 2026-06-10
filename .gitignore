@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+._*
+.cache/
+.jupyter/
+.viminfo
+.bash_history
+.nemo
+*.lock
+cache/

@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    tritonclient[http] \
+    numpy \
+    soundfile \
+    scipy \
+    python-multipart
+
+WORKDIR /app
+COPY gateway /app/gateway
+
+CMD ["uvicorn", "gateway.app:app", "--host", "0.0.0.0", "--port", "8000"]

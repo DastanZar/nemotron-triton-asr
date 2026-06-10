@@ -1,0 +1,55 @@
+services:
+  triton:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.triton
+    container_name: nemotron-triton
+    shm_size: "2gb"
+    restart: unless-stopped
+    environment:
+      HF_HOME: /models/.hf-cache
+      MODEL_NAME: nvidia/nemotron-3.5-asr-streaming-0.6b
+      TARGET_LANG_DEFAULT: auto
+      ATT_CONTEXT_SIZE: "[56,3]"
+      STRIP_LANG_TAGS: "true"
+      MAX_SESSION_IDLE_SEC: "900"
+      LOG_LEVEL: INFO
+    volumes:
+      - ./model_repository:/models/model_repository
+      - ./cache/hf:/models/.hf-cache
+    command:
+      - tritonserver
+      - --model-repository=/models/model_repository
+      - --log-verbose=1
+      - --http-port=8001
+      - --grpc-port=8002
+      - --metrics-port=8003
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8001:8001"
+      - "8002:8002"
+      - "8003:8003"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.gateway
+    container_name: nemotron-gateway
+    restart: unless-stopped
+    environment:
+      TRITON_URL: triton:8001
+      MODEL_NAME: nemotron_streaming
+      DEFAULT_CHUNK_MS: "320"
+      AUDIO_DIR: /data/test_audio
+    volumes:
+      - ./test_audio:/data/test_audio:ro
+    depends_on:
+      - triton
+    ports:
+      - "8000:8000"

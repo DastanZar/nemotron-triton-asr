@@ -1,0 +1,91 @@
+name: "nemotron_streaming"
+backend: "python"
+max_batch_size: 64
+
+input [
+  {
+    name: "AUDIO_CHUNK"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  },
+  {
+    name: "AUDIO_LENGTH"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "STREAM_ID"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "TARGET_LANG"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "IS_START"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  },
+  {
+    name: "IS_END"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "TRANSCRIPT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "IS_FINAL"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  },
+  {
+    name: "LANGUAGE"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_GPU
+    count: 1
+  }
+]
+
+dynamic_batching {
+  preferred_batch_size: [ 4, 8, 16, 32 ]
+  max_queue_delay_microseconds: 2000
+}
+
+parameters: {
+  key: "MODEL_NAME"
+  value: { string_value: "nvidia/nemotron-3.5-asr-streaming-0.6b" }
+}
+
+parameters: {
+  key: "TARGET_LANG_DEFAULT"
+  value: { string_value: "auto" }
+}
+
+parameters: {
+  key: "ATT_CONTEXT_SIZE"
+  value: { string_value: "[56,3]" }
+}
+
+parameters: {
+  key: "STRIP_LANG_TAGS"
+  value: { string_value: "true" }
+}
+
+parameters: {
+  key: "MAX_SESSION_IDLE_SEC"
+  value: { string_value: "900" }
+}
